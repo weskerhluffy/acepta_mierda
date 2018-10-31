@@ -231,7 +231,7 @@ char *caca_comun_matrix_a_cadena(tipo_dato *matrix, natural filas_tam,
 		natural columas_tam, char *buffer) {
 	int i, j;
 	natural inicio_buffer_act = 0;
-	for (int i = 0; i < filas_tam; i++) {
+	for (i = 0; i < filas_tam; i++) {
 		caca_comun_arreglo_a_cadena(matrix + i * columas_tam, columas_tam,
 				buffer + inicio_buffer_act);
 		inicio_buffer_act += strlen(buffer + inicio_buffer_act);
@@ -362,8 +362,9 @@ CACA_COMUN_FUNC_STATICA char caca_comun_letra_a_valor_minuscula(char letra) {
 CACA_COMUN_FUNC_STATICA natural caca_comun_max_natural(natural *nums,
 		natural nums_tam) {
 	natural max = 0;
+	int i = 0;
 
-	for (int i = 0; i < nums_tam; i++) {
+	for (i = 0; i < nums_tam; i++) {
 		natural num_act = nums[i];
 		if (num_act > max) {
 			max = num_act;
@@ -871,8 +872,10 @@ int hash_map_robin_hood_back_shift_init(hm_rr_bs_tabla *ht, int num_cubetas) {
 	return 0;
 }
 int hash_map_robin_hood_back_shift_fini(hm_rr_bs_tabla *ht) {
+	uint32_t i = 0;
+	i = 0;
 	if (ht->buckets_ != NULL) {
-		for (uint32_t i = 0; i < ht->num_buckets_; i++) {
+		for (i = 0; i < ht->num_buckets_; i++) {
 			if (ht->buckets_[i].entry != NULL) {
 				free(ht->buckets_[i].entry);
 				ht->buckets_[i].entry = NULL;
@@ -1000,7 +1003,8 @@ int hash_map_robin_hood_back_shift_borra(hm_rr_bs_tabla *ht, const void *key,
 	uint64_t index_current = 0;
 	uint64_t probe_distance = 0;
 	hm_entry *entrada = NULL;
-	for (uint64_t i = 0; i < num_cubetas; i++) {
+	uint64_t i = 0;
+	for (i = 0; i < num_cubetas; i++) {
 		index_current = (index_init + i) % num_cubetas;
 		entrada = ht->buckets_[index_current].entry;
 		hash_map_robin_hood_back_shift_llena_distancia_a_indice_inicio(ht,
@@ -1201,7 +1205,7 @@ typedef char *(*heap_shit_elemento_a_cadena)(void *valor, char *buffer);
 struct heap_shit {
 	bool min;
 	natural heap_size;
-	heap_shit_nodo heap[HEAP_SHIT_MAX_NODOS];
+	heap_shit_nodo heap[HEAP_SHIT_MAX_NODOS + 1];
 	hm_rr_bs_tabla *tablon_llave_a_idx_heap;
 	heap_shit_compara_prioridad compara_prioridad_fn;
 	heap_shit_obten_llave obten_llave_fn;
@@ -1259,7 +1263,7 @@ static inline void heap_shit_push_up(heap_shit *heap_ctx, natural idx) {
 
 	assert_timeout(idx);
 	assert_timeout(idx <= heap_size);
-	assert_timeout(heap_size<HEAP_SHIT_MAX_NODOS);
+	assert_timeout(heap_size<=HEAP_SHIT_MAX_NODOS);
 
 	nodo = heap[idx];
 
@@ -1303,7 +1307,7 @@ static inline void heap_shit_push_down(heap_shit *heap_ctx, natural idx) {
 
 	assert_timeout(idx);
 	assert_timeout(idx <= heap_size);
-	assert_timeout(heap_size<HEAP_SHIT_MAX_NODOS);
+	assert_timeout(heap_size<=HEAP_SHIT_MAX_NODOS);
 	nodo = heap[idx];
 
 	while (heap_shit_idx_hijo_izq(idx) <= heap_size) {
@@ -1365,7 +1369,7 @@ static inline void heap_shit_insert(heap_shit *heap_ctx,
 	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
 	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
 
-	assert_timeout(heap_size<HEAP_SHIT_MAX_NODOS);
+	assert_timeout(heap_size<=HEAP_SHIT_MAX_NODOS);
 
 	memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT, sizeof(heap_shit_nodo_llave));
 	llave = heap_ctx->obten_llave_fn(nodo_nuevo->valor, llave);
@@ -1711,21 +1715,22 @@ void fuck_core(sobre *a, natural a_tam, natural k) {
 			obten_prioridad, elemento_a_cadena);
 	sobre *s = NULL;
 	heap_shit_nodo *nodos = NULL;
+	natural i = 0;
 	caca_log_debug("n %u k %u", a_tam, k);
 
 	nodos = calloc(MAX_CACA, sizeof(heap_shit_nodo));
 	assert_timeout(nodos);
-	for (natural i = 0; i < a_tam; i++) {
+	for (i = 0; i < a_tam; i++) {
 		nodos[i].valor = a + i;
 	}
 
-	for (natural i = 0; i < k - 1; i++) {
+	for (i = 0; i < k - 1; i++) {
 		caca_log_debug("insertando prelim %llu:%u", a[i].idx_sobre,
 				a[i].cantidad_dinerin);
 		heap_shit_insert(cola, nodos + i);
 	}
 
-	for (natural i = 0; i <= a_tam - k; i++) {
+	for (i = 0; i <= a_tam - k; i++) {
 		if (i) {
 			caca_log_debug("borrando %llu:%u", a[i-1].idx_sobre,
 					a[i-1].cantidad_dinerin);
@@ -1752,15 +1757,18 @@ void fuck_core(sobre *a, natural a_tam, natural k) {
 	free(nodos);
 }
 
-sobre sobres[MAX_CACA] = { 0 };
+//sobre sobres[MAX_CACA] = { 0 };
 
 void fuck_main() {
 	natural n = 0;
 	natural k = 0;
+	natural i = 0;
+	sobre *sobres = calloc(MAX_CACA, sizeof(sobre));
+	assert_timeout(sobres);
 
 	scanf("%u %u\n", &n, &k);
 	while (n) {
-		for (natural i = 0; i < n; i++) {
+		for (i = 0; i < n; i++) {
 			scanf("%llu", &sobres[i].cantidad_dinerin);
 			sobres[i].idx_sobre = i;
 			caca_log_debug("leido %llu:%u", sobres[i].cantidad_dinerin,
@@ -1771,6 +1779,7 @@ void fuck_main() {
 
 		scanf("%u %u\n", &n, &k);
 	}
+	free(sobres);
 }
 
 int main() {
