@@ -451,1301 +451,142 @@ CACA_COMUN_FUNC_STATICA void caca_comun_invierte_arreglo_natural(natural *a,
 
 #endif
 
-#if 1
+typedef struct sobre {
+	natural id_sobre;
+	entero_largo_sin_signo cantidad_dinerin;
+} sobre;
 
-#if 1
+#define MAX_CACA ((natural)5E5)
 
-#define XXH_PUBLIC_API static inline
-#define FORCE_INLINE static inline
-#define XXH_FORCE_NATIVE_FORMAT 0
+#define monton_obten_idx_padre(i) ((i-1)>>1)
+#define monton_obten_idx_hijo_izq(i) ((i<<1)|1)
+#define monton_obten_idx_hijo_der(i) (monton_obten_idx_hijo_izq(i)+1)
+CACA_COMUN_FUNC_STATICA void monton_push_up(sobre *sobres, natural sobres_tam,
+		natural i, natural *mapeo, natural mapeo_tam, natural idx_inicio) {
+	sobre *sobre_tmp = caca_comun_calloc_local(sobre);
+	assert_timeout(i < sobres_tam);
+	assert_timeout(mapeo_tam >= sobres_tam);
+	assert_timeout(i >= idx_inicio);
+	natural idx = i;
 
-#define XXH_rotl32(x,r) ((x << r) | (x >> (32 - r)))
-#define XXH_rotl64(x,r) ((x << r) | (x >> (64 - r)))
-
-typedef uint64_t U64;
-typedef uint8_t BYTE;
-typedef uint16_t U16;
-typedef uint32_t U32;
-
-static const U64 PRIME64_1 = 11400714785074694791ULL;
-static const U64 PRIME64_2 = 14029467366897019727ULL;
-static const U64 PRIME64_3 = 1609587929392839161ULL;
-static const U64 PRIME64_4 = 9650029242287828579ULL;
-static const U64 PRIME64_5 = 2870177450012600261ULL;
-
-typedef enum {
-	XXH_OK = 0, XXH_ERROR
-} XXH_errorcode;
-
-typedef enum {
-	XXH_bigEndian = 0, XXH_littleEndian = 1
-} XXH_endianess;
-
-typedef struct XXH64_state_s {
-	uint64_t total_len;
-	uint64_t v1;
-	uint64_t v2;
-	uint64_t v3;
-	uint64_t v4;
-	uint64_t mem64[4];
-	uint32_t memsize;
-	uint32_t reserved[2]; /* never read nor write, might be removed in a future version */
-} XXH64_state_t;
-/* typedef'd to XXH64_state_t */
-
-typedef enum {
-	XXH_aligned, XXH_unaligned
-} XXH_alignment;
-
-static int XXH_isLittleEndian(void) {
-	const union {
-		U32 u;
-		BYTE c[4];
-	} one = { 1 }; /* don't use static : performance detrimental  */
-	return one.c[0];
-}
-#define XXH_CPU_LITTLE_ENDIAN   XXH_isLittleEndian()
-
-static U64 XXH64_round(U64 acc, U64 input) {
-	acc += input * PRIME64_2;
-	acc = XXH_rotl64(acc, 31);
-	acc *= PRIME64_1;
-	return acc;
-}
-
-static U64 XXH_read64(const void* memPtr) {
-	U64 val;
-	memcpy(&val, memPtr, sizeof(val));
-	return val;
-}
-
-static U64 XXH_swap64(U64 x) {
-	return ((x << 56) & 0xff00000000000000ULL)
-			| ((x << 40) & 0x00ff000000000000ULL)
-			| ((x << 24) & 0x0000ff0000000000ULL)
-			| ((x << 8) & 0x000000ff00000000ULL)
-			| ((x >> 8) & 0x00000000ff000000ULL)
-			| ((x >> 24) & 0x0000000000ff0000ULL)
-			| ((x >> 40) & 0x000000000000ff00ULL)
-			| ((x >> 56) & 0x00000000000000ffULL);
-}
-
-FORCE_INLINE U64 XXH_readLE64_align(const void* ptr, XXH_endianess endian,
-		XXH_alignment align) {
-	if (align == XXH_unaligned)
-		return endian == XXH_littleEndian ?
-				XXH_read64(ptr) : XXH_swap64(XXH_read64(ptr));
-	else
-		return endian == XXH_littleEndian ?
-				*(const U64*) ptr : XXH_swap64(*(const U64*) ptr);
-}
-
-static U64 XXH64_mergeRound(U64 acc, U64 val) {
-	val = XXH64_round(0, val);
-	acc ^= val;
-	acc = acc * PRIME64_1 + PRIME64_4;
-	return acc;
-}
-
-static U32 XXH_read32(const void* memPtr) {
-	U32 val;
-	memcpy(&val, memPtr, sizeof(val));
-	return val;
-}
-
-static U32 XXH_swap32(U32 x) {
-	return ((x << 24) & 0xff000000) | ((x << 8) & 0x00ff0000)
-			| ((x >> 8) & 0x0000ff00) | ((x >> 24) & 0x000000ff);
-}
-
-FORCE_INLINE U32 XXH_readLE32_align(const void* ptr, XXH_endianess endian,
-		XXH_alignment align) {
-	if (align == XXH_unaligned)
-		return endian == XXH_littleEndian ?
-				XXH_read32(ptr) : XXH_swap32(XXH_read32(ptr));
-	else
-		return endian == XXH_littleEndian ?
-				*(const U32*) ptr : XXH_swap32(*(const U32*) ptr);
-}
-
-#define XXH_get32bits(p) XXH_readLE32_align(p, endian, align)
-
-#define XXH_get64bits(p) XXH_readLE64_align(p, endian, align)
-
-static U64 XXH64_avalanche(U64 h64) {
-	h64 ^= h64 >> 33;
-	h64 *= PRIME64_2;
-	h64 ^= h64 >> 29;
-	h64 *= PRIME64_3;
-	h64 ^= h64 >> 32;
-	return h64;
-}
-
-static U64 XXH64_finalize(U64 h64, const void* ptr, size_t len,
-		XXH_endianess endian, XXH_alignment align) {
-	const BYTE* p = (const BYTE*) ptr;
-
-#define PROCESS1_64          \
-    h64 ^= (*p) * PRIME64_5; \
-    p++;                     \
-    h64 = XXH_rotl64(h64, 11) * PRIME64_1;
-
-#define PROCESS4_64          \
-    h64 ^= (U64)(XXH_get32bits(p)) * PRIME64_1; \
-    p+=4;                    \
-    h64 = XXH_rotl64(h64, 23) * PRIME64_2 + PRIME64_3;
-
-#define PROCESS8_64 {        \
-    U64 const k1 = XXH64_round(0, XXH_get64bits(p)); \
-    p+=8;                    \
-    h64 ^= k1;               \
-    h64  = XXH_rotl64(h64,27) * PRIME64_1 + PRIME64_4; \
-}
-
-	switch (len & 31) {
-	case 24:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 16:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 8:
-		PROCESS8_64
-		;
-		return XXH64_avalanche(h64);
-
-	case 28:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 20:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 12:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 4:
-		PROCESS4_64
-		;
-		return XXH64_avalanche(h64);
-
-	case 25:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 17:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 9:
-		PROCESS8_64
-		;
-		PROCESS1_64
-		;
-		return XXH64_avalanche(h64);
-
-	case 29:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 21:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 13:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 5:
-		PROCESS4_64
-		;
-		PROCESS1_64
-		;
-		return XXH64_avalanche(h64);
-
-	case 26:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 18:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 10:
-		PROCESS8_64
-		;
-		PROCESS1_64
-		;
-		PROCESS1_64
-		;
-		return XXH64_avalanche(h64);
-
-	case 30:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 22:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 14:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 6:
-		PROCESS4_64
-		;
-		PROCESS1_64
-		;
-		PROCESS1_64
-		;
-		return XXH64_avalanche(h64);
-
-	case 27:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 19:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 11:
-		PROCESS8_64
-		;
-		PROCESS1_64
-		;
-		PROCESS1_64
-		;
-		PROCESS1_64
-		;
-		return XXH64_avalanche(h64);
-
-	case 31:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 23:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 15:
-		PROCESS8_64
-		;
-		/* fallthrough */
-	case 7:
-		PROCESS4_64
-		;
-		/* fallthrough */
-	case 3:
-		PROCESS1_64
-		;
-		/* fallthrough */
-	case 2:
-		PROCESS1_64
-		;
-		/* fallthrough */
-	case 1:
-		PROCESS1_64
-		;
-		/* fallthrough */
-	case 0:
-		return XXH64_avalanche(h64);
+	*sobre_tmp = sobres[idx];
+	while (idx > idx_inicio
+			&& sobres[idx].cantidad_dinerin
+					> sobres[monton_obten_idx_padre(idx)].cantidad_dinerin) {
+		sobres[idx] = sobres[monton_obten_idx_padre(idx)];
+		mapeo[sobres[idx].id_sobre] = idx;
+		caca_log_debug("aora %llu:%u esta en %u", sobres[idx].cantidad_dinerin,
+				sobres[idx].id_sobre, idx);
+		idx = monton_obten_idx_padre(idx);
 	}
-
-	/* impossible to reach */
-	assert(0);
-	return 0; /* unreachable, but some compilers complain without it */
+	sobres[idx] = *sobre_tmp;
+	mapeo[sobres[idx].id_sobre] = idx;
+	caca_log_debug("finalmente %llu:%u esta en %u",
+			sobres[idx].cantidad_dinerin, sobres[idx].id_sobre, idx);
 }
 
-FORCE_INLINE U64 XXH64_endian_align(const void* input, size_t len, U64 seed,
-		XXH_endianess endian, XXH_alignment align) {
-	const BYTE* p = (const BYTE*) input;
-	const BYTE* bEnd = p + len;
-	U64 h64;
+CACA_COMUN_FUNC_STATICA void monton_push_down(sobre *sobres, natural sobres_tam,
+		natural i, natural *mapeo, natural mapeo_tam, natural idx_inicio) {
+	sobre *sobre_tmp = caca_comun_calloc_local(sobre);
+	assert_timeout(i < sobres_tam);
+	assert_timeout(mapeo_tam >= sobres_tam);
+	assert_timeout(i >= idx_inicio);
+	natural idx = i;
 
-	if (len >= 32) {
-		const BYTE* const limit = bEnd - 32;
-		U64 v1 = seed + PRIME64_1 + PRIME64_2;
-		U64 v2 = seed + PRIME64_2;
-		U64 v3 = seed + 0;
-		U64 v4 = seed - PRIME64_1;
+	*sobre_tmp = sobres[idx];
 
-		do {
-			v1 = XXH64_round(v1, XXH_get64bits(p));
-			p += 8;
-			v2 = XXH64_round(v2, XXH_get64bits(p));
-			p += 8;
-			v3 = XXH64_round(v3, XXH_get64bits(p));
-			p += 8;
-			v4 = XXH64_round(v4, XXH_get64bits(p));
-			p += 8;
-		} while (p <= limit);
-
-		h64 =
-				XXH_rotl64(v1,
-						1) + XXH_rotl64(v2, 7) + XXH_rotl64(v3, 12) + XXH_rotl64(v4, 18);
-		h64 = XXH64_mergeRound(h64, v1);
-		h64 = XXH64_mergeRound(h64, v2);
-		h64 = XXH64_mergeRound(h64, v3);
-		h64 = XXH64_mergeRound(h64, v4);
-
-	} else {
-		h64 = seed + PRIME64_5;
-	}
-
-	h64 += (U64) len;
-
-	return XXH64_finalize(h64, p, len, endian, align);
-}
-
-#define XXH_FORCE_ALIGN_CHECK 0
-XXH_PUBLIC_API unsigned long long XXH64(const void* input, size_t len,
-		unsigned long long seed) {
-#if 0
-	/* Simple version, good for code maintenance, but unfortunately slow for small inputs */
-	XXH64_state_t state;
-	XXH64_reset(&state, seed);
-	XXH64_update(&state, input, len);
-	return XXH64_digest(&state);
-#else
-	XXH_endianess endian_detected = (XXH_endianess) XXH_CPU_LITTLE_ENDIAN;
-
-	if (XXH_FORCE_ALIGN_CHECK) {
-		if ((((size_t) input) & 7) == 0) { /* Input is aligned, let's leverage the speed advantage */
-			if ((endian_detected == XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
-				return XXH64_endian_align(input, len, seed, XXH_littleEndian,
-						XXH_aligned);
-			else
-				return XXH64_endian_align(input, len, seed, XXH_bigEndian,
-						XXH_aligned);
-		}
-	}
-
-	if ((endian_detected == XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
-		return XXH64_endian_align(input, len, seed, XXH_littleEndian,
-				XXH_unaligned);
-	else
-		return XXH64_endian_align(input, len, seed, XXH_bigEndian,
-				XXH_unaligned);
-#endif
-}
-
-#endif
-
-typedef natural hm_iter;
-#define HASH_MAP_VALOR_INVALIDO ((hm_iter)CACA_COMUN_VALOR_INVALIDO)
-typedef struct hash_map_entry {
-	const void *llave;
-	natural llave_tam;
-	entero_largo valor;
-} hm_entry;
-typedef struct hash_map_cubeta {
-	uint64_t hash;
-	hm_entry *entry;
-} hm_cubeta;
-typedef struct hash_map_robin_hood_back_shift {
-	hm_cubeta *buckets_;
-	uint64_t num_buckets_;
-	uint64_t num_buckets_used_;
-	uint64_t probing_min_;
-	uint64_t probing_max_;
-} hm_rr_bs_tabla;
-
-static inline entero_largo_sin_signo hash_map_robin_hood_hashear(
-		hm_rr_bs_tabla *ht, byteme *mierda, natural mierda_tam) {
-	entero_largo_sin_signo ass = 0;
-
-	ass = XXH64(mierda, mierda_tam, ass) % ht->num_buckets_;
-	caca_log_debug("%u mapea a %u", *(natural *)mierda, ass);
-	return ass;
-}
-
-int hash_map_robin_hood_back_shift_init(hm_rr_bs_tabla *ht, int num_cubetas) {
-	ht->num_buckets_ = num_cubetas;
-	ht->buckets_ = (hm_cubeta *) calloc(ht->num_buckets_, sizeof(hm_cubeta));
-	ht->num_buckets_used_ = 0;
-	ht->probing_max_ = num_cubetas;
-	return 0;
-}
-int hash_map_robin_hood_back_shift_fini(hm_rr_bs_tabla *ht) {
-	uint32_t i = 0;
-	i = 0;
-	if (ht->buckets_ != NULL) {
-		for (i = 0; i < ht->num_buckets_; i++) {
-			if (ht->buckets_[i].entry != NULL) {
-				free(ht->buckets_[i].entry);
-				ht->buckets_[i].entry = NULL;
-			}
-		}
-		free(ht->buckets_);
-	}
-	return 0;
-}
-static inline int hash_map_robin_hood_back_shift_llena_distancia_a_indice_inicio(
-		hm_rr_bs_tabla *ht, uint64_t index_stored, uint64_t *distance) {
-	hm_cubeta cubeta = ht->buckets_[index_stored];
-	*distance = 0;
-	if (cubeta.entry == NULL)
-		return -1;
-	uint64_t num_cubetas = ht->num_buckets_;
-	uint64_t index_init = cubeta.hash % num_cubetas;
-	if (index_init <= index_stored) {
-		*distance = index_stored - index_init;
-	} else {
-		*distance = index_stored + (num_cubetas - index_init);
-	}
-	return 0;
-}
-hm_iter hash_map_robin_hood_back_shift_obten(hm_rr_bs_tabla *ht,
-		const void *key, natural key_len, entero_largo *value) {
-	uint64_t num_cubetas = ht->num_buckets_;
-	uint64_t prob_max = ht->probing_max_;
-	uint64_t hash = hash_map_robin_hood_hashear(ht, (void *) key, key_len);
-	uint64_t index_init = hash;
-	uint64_t probe_distance = 0;
-	uint64_t index_current;
-	bool found = falso;
-	uint32_t i;
-	*value = HASH_MAP_VALOR_INVALIDO;
-	for (i = 0; i < num_cubetas; i++) {
-		index_current = (index_init + i) % num_cubetas;
-		hm_entry *entrada = ht->buckets_[index_current].entry;
-		if (entrada == NULL) {
-			break;
-		}
-		hash_map_robin_hood_back_shift_llena_distancia_a_indice_inicio(ht,
-				index_current, &probe_distance);
-		if (i > probe_distance) {
-			break;
-		}
-		if (!memcmp(entrada->llave, key, entrada->llave_tam)) {
-			*value = entrada->valor;
-			found = verdadero;
-			break;
-		}
-	}
-	if (found)
-		return index_current;
-	return HASH_MAP_VALOR_INVALIDO;
-}
-hm_iter hash_map_robin_hood_back_shift_pon(hm_rr_bs_tabla *ht, const void *key,
-		natural key_len, entero_largo value, bool *nuevo_entry) {
-	uint64_t num_cubetas = ht->num_buckets_;
-	uint64_t prob_max = ht->probing_max_;
-	uint64_t prob_min = ht->probing_min_;
-	hm_cubeta *cubetas = ht->buckets_;
-	*nuevo_entry = verdadero;
-	if (ht->num_buckets_used_ == num_cubetas) {
-		*nuevo_entry = falso;
-		return HASH_MAP_VALOR_INVALIDO;
-	}
-	ht->num_buckets_used_ += 1;
-	uint64_t hash = hash_map_robin_hood_hashear(ht, (void *) key, key_len);
-	uint64_t index_init = hash;
-	hm_entry *entry = (hm_entry *) calloc(1, sizeof(hm_entry));
-	entry->llave = key;
-	entry->llave_tam = key_len;
-	entry->valor = value;
-	uint64_t index_current = index_init % num_cubetas;
-	uint64_t probe_current = 0;
-	uint64_t probe_distance;
-	hm_entry *entry_temp;
-	uint64_t hash_temp;
-	uint64_t i;
-	for (i = 0; i < num_cubetas; i++) {
-		index_current = (index_init + i) % num_cubetas;
-		hm_cubeta *cubeta = cubetas + index_current;
-		if (cubeta->entry == NULL) {
-			cubeta->entry = entry;
-			cubeta->hash = hash;
-			if (index_current > prob_max) {
-				ht->probing_max_ = index_current;
-			}
-			if (index_current < prob_min) {
-				ht->probing_min_ = index_current;
-			}
-			break;
-		} else {
-			if (!memcmp(cubeta->entry->llave, key, cubeta->entry->llave_tam)) {
-				free(entry);
-				*nuevo_entry = falso;
-				break;
-			}
-			hash_map_robin_hood_back_shift_llena_distancia_a_indice_inicio(ht,
-					index_current, &probe_distance);
-			if (probe_current > probe_distance) {
-				// Swapping the current bucket with the one to insert
-				entry_temp = cubeta->entry;
-				hash_temp = cubeta->hash;
-				cubeta->entry = entry;
-				cubeta->hash = hash;
-				entry = entry_temp;
-				hash = hash_temp;
-				probe_current = probe_distance;
-			}
-		}
-		probe_current++;
-	}
-	return index_current;
-}
-int hash_map_robin_hood_back_shift_borra(hm_rr_bs_tabla *ht, const void *key,
-		natural key_len) {
-	uint64_t num_cubetas = ht->num_buckets_;
-	uint64_t prob_max = ht->probing_max_;
-	uint64_t prob_min = ht->probing_max_;
-	uint64_t hash = hash_map_robin_hood_hashear(ht, (void *) key, key_len);
-	uint64_t index_init = hash;
-	bool found = falso;
-	uint64_t index_current = 0;
-	uint64_t probe_distance = 0;
-	hm_entry *entrada = NULL;
-	uint64_t i = 0;
-	for (i = 0; i < num_cubetas; i++) {
-		index_current = (index_init + i) % num_cubetas;
-		entrada = ht->buckets_[index_current].entry;
-		hash_map_robin_hood_back_shift_llena_distancia_a_indice_inicio(ht,
-				index_current, &probe_distance);
-		if (entrada == NULL || i > probe_distance) {
-			break;
-		}
-		if (!memcmp(entrada->llave, key, entrada->llave_tam)) {
-			found = verdadero;
-			break;
-		}
-	}
-	if (found) {
-		free(entrada);
-		uint64_t i = 1;
-		uint64_t index_previous = 0, index_swap = 0;
-		for (i = 1; i < num_cubetas; i++) {
-			index_previous = (index_current + i - 1) % num_cubetas;
-			index_swap = (index_current + i) % num_cubetas;
-			hm_cubeta *cubeta_swap = ht->buckets_ + index_swap;
-			hm_cubeta *cubeta_previous = ht->buckets_ + index_previous;
-			if (cubeta_swap->entry == NULL) {
-				cubeta_previous->entry = NULL;
-				break;
-			}
-			uint64_t distance;
-			if (hash_map_robin_hood_back_shift_llena_distancia_a_indice_inicio(
-					ht, index_swap, &distance) != 0) {
-				fprintf(stderr, "Error in FillDistanceToInitIndex()");
-			}
-			if (!distance) {
-				cubeta_previous->entry = NULL;
-				break;
-			}
-			cubeta_previous->entry = cubeta_swap->entry;
-			cubeta_previous->hash = cubeta_swap->hash;
-		}
-		if (i < num_cubetas) {
-			if (index_previous == prob_min) {
-				prob_min++;
-				if (prob_min >= num_cubetas) {
-					prob_min = 0;
-				} else {
-					while (prob_min < num_cubetas
-							&& ht->buckets_[prob_min].entry) {
-						prob_min++;
-					}
-					if (prob_min >= num_cubetas) {
-						prob_min = num_cubetas;
-					}
-				}
-				ht->probing_min_ = prob_min;
-			}
-			if (index_previous == prob_max) {
-				prob_max--;
-				if (prob_max >= num_cubetas) {
-					prob_max = num_cubetas;
-				} else {
-					while (((int64_t) prob_max) >= 0
-							&& ht->buckets_[prob_max].entry) {
-						prob_max--;
-					}
-					if (prob_max >= num_cubetas) {
-						prob_max = 0;
-					}
-				}
-				ht->probing_max_ = prob_max;
-			}
-		}
-		ht->num_buckets_used_--;
-		return 0;
-	}
-	return 1;
-}
-static inline void hash_map_robin_hood_back_shift_indice_pon_valor(
-		hm_rr_bs_tabla *ht, hm_iter indice, entero_largo valor) {
-	assert_timeout(indice <= ht->probing_max_ && indice >= ht->probing_min_);
-	hm_entry *entrada = ht->buckets_[indice].entry;
-	assert_timeout(entrada);
-	entrada->valor = valor;
-}
-int hash_map_robin_hood_back_shift_indice_borra(hm_rr_bs_tabla *ht,
-		hm_iter indice) {
-	assert_timeout(indice <= ht->probing_max_ && indice >= ht->probing_min_);
-	uint64_t num_cubetas = ht->num_buckets_;
-	uint64_t prob_max = ht->probing_max_;
-	uint64_t prob_min = ht->probing_max_;
-	uint64_t index_current = indice;
-	hm_entry *entrada = ht->buckets_[index_current].entry;
-	assert_timeout(entrada);
-	free(entrada);
-	uint64_t i = 1;
-	uint64_t index_previous = 0, index_swap = 0;
-	for (i = 1; i < num_cubetas; i++) {
-		index_previous = (index_current + i - 1) % num_cubetas;
-		index_swap = (index_current + i) % num_cubetas;
-		hm_cubeta *cubeta_swap = ht->buckets_ + index_swap;
-		hm_cubeta *cubeta_previous = ht->buckets_ + index_previous;
-		if (cubeta_swap->entry == NULL) {
-			cubeta_previous->entry = NULL;
-			break;
-		}
-		uint64_t distance;
-		if (hash_map_robin_hood_back_shift_llena_distancia_a_indice_inicio(ht,
-				index_swap, &distance) != 0) {
-			fprintf(stderr, "Error in FillDistanceToInitIndex()");
-		}
-		if (!distance) {
-			cubeta_previous->entry = NULL;
-			break;
-		}
-		cubeta_previous->entry = cubeta_swap->entry;
-		cubeta_previous->hash = cubeta_swap->hash;
-	}
-	if (i < num_cubetas) {
-		if (index_previous == prob_min) {
-			prob_min++;
-			if (prob_min >= num_cubetas) {
-				prob_min = 0;
-			} else {
-				while (prob_min < num_cubetas && ht->buckets_[prob_min].entry) {
-					prob_min++;
-				}
-				if (prob_min >= num_cubetas) {
-					prob_min = num_cubetas;
-				}
-			}
-			ht->probing_min_ = prob_min;
-		}
-		if (index_previous == prob_max) {
-			prob_max--;
-			if (prob_max >= num_cubetas) {
-				prob_max = num_cubetas;
-			} else {
-				while (((int64_t) prob_max) >= 0 && ht->buckets_[prob_max].entry) {
-					prob_max--;
-				}
-				if (prob_max >= num_cubetas) {
-					prob_max = 0;
-				}
-			}
-			ht->probing_max_ = prob_max;
-		}
-	}
-	ht->num_buckets_used_--;
-	return 0;
-}
-
-static inline void hash_map_robin_hood_back_shift_reemplazar(hm_rr_bs_tabla *ht,
-		void *llave, natural llave_tam, entero_largo valor) {
-	hm_iter iter = 0;
-	entero_largo *valor_int = &(entero_largo ) { 0 };
-
-	iter = hash_map_robin_hood_back_shift_obten(ht, llave, llave_tam,
-			valor_int);
-
-	assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
-
-	hash_map_robin_hood_back_shift_indice_pon_valor(ht, iter, valor);
-}
-
-static inline void hash_map_robin_hood_back_shift_insertar_nuevo(
-		hm_rr_bs_tabla *ht, void *llave, natural llave_tam, entero_largo valor) {
-	hm_iter iter = 0;
-	bool nuevo = falso;
-	iter = hash_map_robin_hood_back_shift_pon(ht, llave, llave_tam, valor,
-			&nuevo);
-
-	assert_timeout(iter!=HASH_MAP_VALOR_INVALIDO);
-	assert_timeout(nuevo);
-}
-
-#endif
-
-#if 1
-
-//http://www.thelearningpoint.net/computer-science/data-structures-heaps-with-c-program-source-code
-#define HEAP_SHIT_MAX_NODOS ((natural)2E5)
-#define HEAP_SHIT_MAX_LLAVES HEAP_SHIT_MAX_NODOS
-#define HEAP_SHIT_VALOR_INVALIDO ((entero_largo_sin_signo)(((entero_largo_sin_signo)CACA_COMUN_VALOR_INVALIDO)<<32 | (entero_largo_sin_signo)CACA_COMUN_VALOR_INVALIDO))
-#define HEAP_SHIT_VALOR_INVALIDO_INT ((int)HEAP_SHIT_VALOR_INVALIDO)
-
-typedef struct heap_shit_nodo {
-	void *valor;
-} heap_shit_nodo;
-typedef struct heap_shit_nodo_llave {
-	void *contenido;
-	natural contenido_tam;
-} heap_shit_nodo_llave;
-typedef struct heap_shit heap_shit;
-
-typedef int (*heap_shit_compara_prioridad)(void *a, void *b);
-typedef heap_shit_nodo_llave *(*heap_shit_obten_llave)(void *valor,
-		heap_shit_nodo_llave *llave_res);
-typedef void *(*heap_shit_obten_prioridad)(void *valor);
-typedef char *(*heap_shit_elemento_a_cadena)(void *valor, char *buffer);
-
-struct heap_shit {
-	bool min;
-	natural heap_size;
-	heap_shit_nodo heap[HEAP_SHIT_MAX_NODOS + 1];
-	hm_rr_bs_tabla *tablon_llave_a_idx_heap;
-	heap_shit_compara_prioridad compara_prioridad_fn;
-	heap_shit_obten_llave obten_llave_fn;
-	heap_shit_obten_prioridad obten_prioridad_fn;
-	heap_shit_elemento_a_cadena elem_a_cad_fn;
-};
-
-/*Initialize Heap*/
-static inline heap_shit *heap_shit_init(bool es_min,
-		heap_shit_compara_prioridad compara_prioridad_fn,
-		heap_shit_obten_llave obten_llave_fn,
-		heap_shit_obten_prioridad obten_prioridad_fn,
-		heap_shit_elemento_a_cadena elem_a_cad_fn) {
-	heap_shit *heap = calloc(1, sizeof(heap_shit));
-	assert_timeout(heap);
-	heap->heap_size = 0;
-	heap->min = es_min;
-	heap->compara_prioridad_fn = compara_prioridad_fn;
-	heap->obten_llave_fn = obten_llave_fn;
-	heap->obten_prioridad_fn = obten_prioridad_fn;
-	memset(heap->heap, HEAP_SHIT_VALOR_INVALIDO_INT, sizeof(heap->heap));
-	heap->tablon_llave_a_idx_heap = calloc(1, sizeof(hm_rr_bs_tabla));
-	assert_timeout(heap->tablon_llave_a_idx_heap);
-	hash_map_robin_hood_back_shift_init(heap->tablon_llave_a_idx_heap,
-	HEAP_SHIT_MAX_NODOS << 1);
-	heap->elem_a_cad_fn = elem_a_cad_fn;
-	return heap;
-}
-
-void heap_shit_fini(heap_shit *heap_ctx) {
-	hash_map_robin_hood_back_shift_fini(heap_ctx->tablon_llave_a_idx_heap);
-	free(heap_ctx->tablon_llave_a_idx_heap);
-	free(heap_ctx);
-}
-
-static inline natural heap_shit_idx_padre(natural idx_nodo) {
-	return idx_nodo >> 1;
-}
-
-static inline natural heap_shit_idx_hijo_izq(natural idx_nodo) {
-	return idx_nodo << 1;
-}
-
-static inline natural heap_shit_idx_hijo_der(natural idx_nodo) {
-	return heap_shit_idx_hijo_izq(idx_nodo) + 1;
-}
-
-static inline void heap_shit_push_up(heap_shit *heap_ctx, natural idx) {
-	natural heap_size = heap_ctx->heap_size;
-	heap_shit_nodo *heap = heap_ctx->heap;
-	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
-	heap_shit_nodo nodo;
-	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
-	natural idx_padre = 0;
-
-	assert_timeout(idx);
-	assert_timeout(idx <= heap_size);
-	assert_timeout(heap_size<=HEAP_SHIT_MAX_NODOS);
-
-	nodo = heap[idx];
-
-	while ((idx_padre = heap_shit_idx_padre(idx))
-			&& ((heap_ctx->min
-					&& heap_ctx->compara_prioridad_fn(nodo.valor,
-							heap[idx_padre].valor) < 0)
-					|| (!heap_ctx->min
-							&& heap_ctx->compara_prioridad_fn(nodo.valor,
-									heap[idx_padre].valor) > 0))) {
-
-// TODO: hacer macro para limpiar memoria
-		memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT,
-				sizeof(heap_shit_nodo_llave));
-		llave = heap_ctx->obten_llave_fn(heap[idx_padre].valor, llave);
-		assert_timeout(
-				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-
-		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
-				llave->contenido_tam, idx);
-		heap[idx] = heap[idx_padre];
-		idx = idx_padre;
-	}
-
-	memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT, sizeof(heap_shit_nodo_llave));
-	llave = heap_ctx->obten_llave_fn(nodo.valor, llave);
-	assert_timeout(
-			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-	hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
-			llave->contenido_tam, idx);
-	heap[idx] = nodo;
-
-}
-
-static inline void heap_shit_push_down(heap_shit *heap_ctx, natural idx) {
-	natural heap_size = heap_ctx->heap_size;
-	heap_shit_nodo *heap = heap_ctx->heap;
-	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
-	heap_shit_nodo nodo = { 0 };
-	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
-
-	assert_timeout(idx);
-	assert_timeout(idx <= heap_size);
-	assert_timeout(heap_size<=HEAP_SHIT_MAX_NODOS);
-	nodo = heap[idx];
-
-	while (heap_shit_idx_hijo_izq(idx) <= heap_size) {
-		natural idx_hijo_izq = heap_shit_idx_hijo_izq(idx);
-		natural idx_hijo_der = heap_shit_idx_hijo_der(idx);
+	while (monton_obten_idx_hijo_izq(idx) < sobres_tam) {
 		natural idx_hijo = idx;
-		heap_shit_nodo *nodo_sig = &nodo;
-		if ((heap_ctx->min
-				&& heap_ctx->compara_prioridad_fn(nodo.valor,
-						heap[idx_hijo_izq].valor) > 0)
-				|| (!heap_ctx->min
-						&& heap_ctx->compara_prioridad_fn(nodo.valor,
-								heap[idx_hijo_izq].valor) < 0)) {
+		natural idx_hijo_izq = monton_obten_idx_hijo_izq(idx);
+		natural idx_hijo_der = monton_obten_idx_hijo_der(idx);
+		if (sobres[idx_hijo_izq].cantidad_dinerin
+				> sobres[idx_hijo].cantidad_dinerin) {
 			idx_hijo = idx_hijo_izq;
-			nodo_sig = heap + idx_hijo;
 		}
-
-		if (heap_shit_idx_hijo_der(idx) <= heap_size
-				&& ((heap_ctx->min
-						&& heap_ctx->compara_prioridad_fn(nodo_sig->valor,
-								heap[idx_hijo_der].valor) > 0)
-						|| (!heap_ctx->min
-								&& heap_ctx->compara_prioridad_fn(
-										nodo_sig->valor,
-										heap[idx_hijo_der].valor) < 0))) {
+		if (idx_hijo_der < sobres_tam
+				&& sobres[idx_hijo_der].cantidad_dinerin
+						> sobres[idx_hijo].cantidad_dinerin) {
 			idx_hijo = idx_hijo_der;
-			nodo_sig = heap + idx_hijo;
 		}
 		if (idx == idx_hijo) {
 			break;
 		}
-
-		memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT,
-				sizeof(heap_shit_nodo_llave));
-		llave = heap_ctx->obten_llave_fn(nodo_sig->valor, llave);
-		assert_timeout(
-				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
-				llave->contenido_tam, idx);
-		heap[idx] = heap[idx_hijo];
+		sobres[idx] = sobres[idx_hijo];
+		mapeo[sobres[idx].id_sobre] = idx;
+		caca_log_debug("aora %llu:%u esta en %u", sobres[idx].cantidad_dinerin,
+				sobres[idx].id_sobre, idx);
 		idx = idx_hijo;
 	}
 
-	memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT, sizeof(heap_shit_nodo_llave));
-	llave = heap_ctx->obten_llave_fn(nodo.valor, llave);
-	assert_timeout(
-			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-	hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
-			llave->contenido_tam, idx);
-	heap[idx] = nodo;
-
+	sobres[idx] = *sobre_tmp;
+	mapeo[sobres[idx].id_sobre] = idx;
+	caca_log_debug("finalmente %llu:%u esta en %u",
+			sobres[idx].cantidad_dinerin, sobres[idx].id_sobre, idx);
 }
 
-/*Insert an element into the heap */
-static inline void heap_shit_insert(heap_shit *heap_ctx,
-		heap_shit_nodo *nodo_nuevo) {
-	natural heap_size = ++heap_ctx->heap_size;
-	heap_shit_nodo *heap = heap_ctx->heap;
-	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
-	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
+// XXX: https://medium.com/basecs/heapify-all-the-things-with-heap-sort-55ee1c93af82
+CACA_COMUN_FUNC_STATICA void monton_montonizar(sobre *sobres,
+		natural sobres_tam, natural i, natural *mapeo, natural mapeo_tam,
+		natural idx_inicio) {
+	natural idx = i;
+	natural idx_padre = monton_obten_idx_padre(idx);
+	assert_timeout(i < sobres_tam);
 
-	assert_timeout(heap_size<=HEAP_SHIT_MAX_NODOS);
-
-	memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT, sizeof(heap_shit_nodo_llave));
-	llave = heap_ctx->obten_llave_fn(nodo_nuevo->valor, llave);
-	assert_timeout(
-			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-	hash_map_robin_hood_back_shift_insertar_nuevo(mapeo_inv, llave->contenido,
-			llave->contenido_tam, heap_size);
-	heap[heap_size] = *nodo_nuevo; /*Insert in the last place*/
-
-	caca_log_debug("insertado inicialmene %s en %u",
-			heap_ctx->elem_a_cad_fn(heap[heap_size].valor,CACA_COMUN_BUF_STATICO),
-			heap_size);
-	heap_shit_push_up(heap_ctx, heap_size);
-}
-
-#define heap_shit_insertar(heap_ctx,valor_in) heap_shit_insert(heap_ctx,&(heap_shit_nodo) {.valor=valor_in})
-#define heap_shit_insertar_valor_unico(heap_ctx,valor) heap_shit_insertar(heap_ctx,valor,valor,(void *)((entero_largo)valor))
-
-static inline void heap_shit_actualiza(heap_shit *ctx, void *valor) {
-	hm_rr_bs_tabla *indices_valores = ctx->tablon_llave_a_idx_heap;
-	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
-	heap_shit_nodo *heap = ctx->heap;
-	entero_largo idx = 0;
-	entero_largo idx_p = 0;
-	heap_shit_nodo *nodo = NULL;
-
-	llave = ctx->obten_llave_fn(valor, llave);
-
-	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
-			llave->contenido, llave->contenido_tam, &idx);
-	assert_timeout(idx_hm!=HASH_MAP_VALOR_INVALIDO);
-	nodo = heap + idx;
-	idx_p = heap_shit_idx_padre(idx);
-
-	caca_log_debug("actualizando %s",
-			ctx->elem_a_cad_fn(nodo->valor,CACA_COMUN_BUF_STATICO));
-
-	caca_log_debug("%s i su padre %s",
-			ctx->elem_a_cad_fn(nodo->valor,CACA_COMUN_BUF_STATICO),
-			idx_p?ctx->elem_a_cad_fn(heap[idx_p].valor,CACA_COMUN_BUF_STATICO):"NADA");
-	if (idx_p
-			&& ((ctx->min
-					&& ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor)
-							< 0)
-					|| (!ctx->min
-							&& ctx->compara_prioridad_fn(nodo->valor,
-									heap[idx_p].valor) > 0))) {
-		caca_log_debug("empujando arriba %hu %d", ctx->min,
-				ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor));
-		heap_shit_push_up(ctx, idx);
+	if (idx > idx_inicio
+			&& sobres[idx].cantidad_dinerin
+					> sobres[idx_padre].cantidad_dinerin) {
+		monton_push_up(sobres, sobres_tam, idx, mapeo, mapeo_tam, idx_inicio);
 	} else {
-		caca_log_debug("empujando abajo %hu %d", ctx->min,
-				idx_p ? ctx->compara_prioridad_fn(nodo->valor, heap[idx_p].valor) : 0);
-		heap_shit_push_down(ctx, idx);
+		monton_push_down(sobres, sobres_tam, idx, mapeo, mapeo_tam, idx_inicio);
 	}
 }
 
-static inline void *heap_shit_consulta_prioridad(heap_shit *ctx, void *llave,
-		natural llave_tam) {
-	hm_rr_bs_tabla *indices_valores = ctx->tablon_llave_a_idx_heap;
-	heap_shit_nodo *heap = ctx->heap;
-	void *prio = NULL;
-	entero_largo idx = 0;
-	heap_shit_nodo *nodo = NULL;
-
-	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
-			llave, llave_tam, &idx);
-	assert_timeout(idx_hm!=HASH_MAP_VALOR_INVALIDO);
-	assert_timeout(idx);
-
-	nodo = heap + idx;
-
-	prio = ctx->obten_prioridad_fn(nodo->valor);
-
-	return prio;
-}
-
-static inline void *heap_shit_contiene_elemento(heap_shit *ctx, void *llave,
-		natural llave_tam) {
-	hm_rr_bs_tabla *indices_valores = ctx->tablon_llave_a_idx_heap;
-	heap_shit_nodo *heap = ctx->heap;
-	entero_largo idx = 0;
-	heap_shit_nodo *nodo = NULL;
-	void *elem = NULL;
-
-	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
-			llave, llave_tam, &idx);
-	if (idx_hm != HASH_MAP_VALOR_INVALIDO) {
-		assert_timeout(idx);
-		nodo = heap + idx;
-		elem = nodo->valor;
-	}
-
-	return elem;
-}
-
-static inline void *heap_shit_consulta_torpe(heap_shit *heap_ctx) {
-	natural heap_size = heap_ctx->heap_size;
-	heap_shit_nodo *heap = heap_ctx->heap;
-
-	if (heap_size) {
-		return heap[1].valor;
-	} else {
-		assert_timeout(
-				heap_ctx->heap[0].valor==(void *)HEAP_SHIT_VALOR_INVALIDO);
-		return NULL;
+CACA_COMUN_FUNC_STATICA void monton_crear(sobre *sobres, natural sobres_tam,
+		natural *mapeo, natural mapeo_tam) {
+	int idx = (sobres_tam >> 1) - 1;
+	while (idx >= 0) {
+		monton_montonizar(sobres, sobres_tam, idx, mapeo, mapeo_tam, idx);
+		idx -= 1;
 	}
 }
 
-static inline void *heap_shit_delete(heap_shit *heap_ctx, natural idx) {
-	natural idx_last = heap_ctx->heap_size--;
-	natural heap_size = heap_ctx->heap_size;
-	heap_shit_nodo nodo = { 0 };
-	heap_shit_nodo *heap = heap_ctx->heap;
-	hm_rr_bs_tabla *mapeo_inv = heap_ctx->tablon_llave_a_idx_heap;
-	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
-	void *resultado;
-
-	assert_timeout(heap_size + 1 >= idx);
-	assert_timeout(idx);
-
-	memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT, sizeof(heap_shit_nodo_llave));
-	llave = heap_ctx->obten_llave_fn(heap[idx].valor, llave);
-	assert_timeout(
-			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-
-	resultado = heap[idx].valor;
-	caca_log_debug("borando %s",
-			heap_ctx->elem_a_cad_fn(resultado,CACA_COMUN_BUF_STATICO));
-	hash_map_robin_hood_back_shift_borra(mapeo_inv, llave->contenido,
-			llave->contenido_tam);
-
-	if (idx != idx_last) {
-		assert_timeout(idx < idx_last);
-		memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT,
-				sizeof(heap_shit_nodo_llave));
-		llave = heap_ctx->obten_llave_fn(heap[idx_last].valor, llave);
-		assert_timeout(
-				(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-		hash_map_robin_hood_back_shift_reemplazar(mapeo_inv, llave->contenido,
-				llave->contenido_tam, idx);
-		heap[idx] = heap[idx_last];
-//		heap_shit_push_down(heap_ctx, idx);
-		heap_shit_actualiza(heap_ctx, heap[idx].valor);
-	}
-
-	memset(heap + idx_last, HEAP_SHIT_VALOR_INVALIDO_INT,
-			sizeof(heap_shit_nodo));
-
-	return resultado;
-}
-
-static inline void *heap_shit_borrar_directo(heap_shit *heap_ctx, void *llave,
-		natural llave_tam) {
-	natural heap_size = heap_ctx->heap_size;
-	hm_rr_bs_tabla *indices_valores = heap_ctx->tablon_llave_a_idx_heap;
-	entero_largo idx_a_borrar;
-
-	assert_timeout(heap_size);
-
-	natural idx_hm = hash_map_robin_hood_back_shift_obten(indices_valores,
-			llave, llave_tam, &idx_a_borrar);
-	assert_timeout(idx_a_borrar <= heap_size);
-	caca_log_debug("borrando llave %s en idx %u en idx hm %u con heap size %u",
-			heap_ctx->elem_a_cad_fn(heap_ctx->heap[idx_a_borrar].valor,CACA_COMUN_BUF_STATICO),
-			idx_a_borrar, idx_hm, heap_size);
-	assert_timeout(idx_hm!=HASH_MAP_VALOR_INVALIDO);
-	assert_timeout(idx_a_borrar != HEAP_SHIT_VALOR_INVALIDO);
-
-	return heap_shit_delete(heap_ctx, idx_a_borrar);
-}
-
-static inline void *heap_shit_borra_torpe(heap_shit *heap_ctx) {
-	heap_shit_nodo_llave *llave = &(heap_shit_nodo_llave ) { 0 };
-
-	memset(llave, HEAP_SHIT_VALOR_INVALIDO_INT, sizeof(heap_shit_nodo_llave));
-	llave = heap_ctx->obten_llave_fn(heap_ctx->heap[1].valor, llave);
-	assert_timeout(
-			(entero_largo_sin_signo)llave->contenido!= HEAP_SHIT_VALOR_INVALIDO);
-	if (heap_ctx->heap_size) {
-		return heap_shit_borrar_directo(heap_ctx, llave->contenido,
-				llave->contenido_tam);
-	} else {
-		assert_timeout(!heap_ctx->heap[0].valor);
-		return NULL;
-	}
-}
-
-static inline bool heap_shit_vacio(heap_shit *ctx) {
-	return !ctx->heap_size;
-}
-
-#endif
-
-#if 1
-
-typedef struct my_struct {
-	void *valor;
-	struct my_struct* next;
-} listilla_nodo;
-
-typedef struct my_list {
-	struct my_struct* head;
-	struct my_struct* tail;
-	natural elementos_cnt;
-} listilla_fifo;
-
-typedef struct listilla_iterador {
-	listilla_fifo *ctx;
-	listilla_nodo *nodo_act;
-	bool primera_llamada;
-	natural llamadas;
-} listilla_iterador;
-
-struct my_list* list_add_element(struct my_list* s, void *valor) {
-	struct my_struct* p = malloc(1 * sizeof(*p));
-
-	if ( NULL == p) {
-		fprintf(stderr, "IN %s, %s: malloc() failed\n", __FILE__, "list_add");
-		return s;
-	}
-
-	p->valor = valor;
-	p->next = NULL;
-
-	if ( NULL == s) {
-		printf("Queue not initialized\n");
-		free(p);
-		return s;
-	} else if ( NULL == s->head && NULL == s->tail) {
-		s->head = s->tail = p;
-		return s;
-	} else if ( NULL == s->head || NULL == s->tail) {
-		fprintf(stderr,
-				"There is something seriously wrong with your assignment of head/tail to the list\n");
-		free(p);
-		return NULL;
-	} else {
-		s->tail->next = p;
-		s->tail = p;
-	}
-	s->elementos_cnt++;
-
-	return s;
-}
-
-static void *list_remove_element(struct my_list* s) {
-	struct my_struct* h = NULL;
-	struct my_struct* p = NULL;
-	void *valor = NULL;
-
-	if ( NULL == s) {
-		printf("List is empty\n");
-		return s;
-	} else if ( NULL == s->head && NULL == s->tail) {
-		printf("Well, List is empty\n");
-		return s;
-	} else if ( NULL == s->head || NULL == s->tail) {
-		printf("There is something seriously wrong with your list\n");
-		printf("One of the head/tail is empty while other is not \n");
-		abort();
-	}
-
-	h = s->head;
-	valor = h->valor;
-	p = h->next;
-	free(h);
-	s->head = p;
-	if ( NULL == s->head)
-		s->tail = s->head; /* The element tail was pointing to is free(), so we need an update */
-
-	s->elementos_cnt--;
-	return valor;
-}
-
-/* ---------------------- small helper fucntions ---------------------------------- */
-struct my_list* list_free(struct my_list* s) {
-	while (s->head) {
-		list_remove_element(s);
-	}
-
-	return s;
-}
-
-struct my_list* list_new(void) {
-	struct my_list* p = malloc(1 * sizeof(*p));
-
-	assert_timeout(p);
-
-	p->head = p->tail = NULL;
-
-	return p;
-}
-
-#endif
-
-typedef struct sobre {
-	natural idx_sobre;
-	entero_largo_sin_signo cantidad_dinerin;
-} sobre;
-
-int compara_prioridad(void *pa, void *pb) {
-	sobre *a = pa;
-	sobre *b = pb;
-	int r = 0;
-	if (a->cantidad_dinerin == b->cantidad_dinerin) {
-		r = (int) a->idx_sobre - (int) b->idx_sobre;
-	} else {
-		entero_largo dif = (entero_largo) a->cantidad_dinerin
-				- (entero_largo) b->cantidad_dinerin;
-		if (dif < 0) {
-			r = -1;
-		} else {
-			if (dif > 0) {
-				r = 1;
-			}
-		}
-
-	}
-	assert_timeout(r);
-	return r;
-}
-heap_shit_nodo_llave *obten_llave(void *valor, heap_shit_nodo_llave *llave_res) {
-	sobre *a = valor;
-	llave_res->contenido = &a->idx_sobre;
-	llave_res->contenido_tam = sizeof(a->idx_sobre);
-	return llave_res;
-}
-void *obten_prioridad(void *valor) {
-	sobre *a = valor;
-	return &a->cantidad_dinerin;
-}
-char *elemento_a_cadena(void *valor, char *buffer) {
-	sobre *a = valor;
-	sprintf(buffer, "%llu:%u", a->cantidad_dinerin, a->idx_sobre);
-	return buffer;
-}
-
-#define MAX_CACA ((natural)5E5)
+sobre sobres[MAX_CACA] = { 0 };
+natural mapeo[MAX_CACA] = { 0 };
 
 void fuck_core(sobre *a, natural a_tam, natural k) {
-	heap_shit *cola = heap_shit_init(falso, compara_prioridad, obten_llave,
-			obten_prioridad, elemento_a_cadena);
 	sobre *s = NULL;
-	heap_shit_nodo *nodos = NULL;
 	natural i = 0;
+	sobre *max = NULL;
 	caca_log_debug("n %u k %u", a_tam, k);
 
-	nodos = calloc(MAX_CACA, sizeof(heap_shit_nodo));
-	assert_timeout(nodos);
 	for (i = 0; i < a_tam; i++) {
-		nodos[i].valor = a + i;
+		mapeo[i] = a[i].id_sobre;
+		assert_timeout(a[i].id_sobre == i);
 	}
 
-	for (i = 0; i < k - 1; i++) {
-		caca_log_debug("insertando prelim %llu:%u", a[i].idx_sobre,
-				a[i].cantidad_dinerin);
-		heap_shit_insert(cola, nodos + i);
+	monton_crear(a, k, mapeo, MAX_CACA);
+	max = a;
+	caca_log_debug("el maxe en %u es %llu", i, max->cantidad_dinerin);
+	printf("%llu", max->cantidad_dinerin);
+	if (i > 1) {
+		printf(" ");
 	}
 
-	for (i = 0; i <= a_tam - k; i++) {
-		if (i) {
-			caca_log_debug("borrando %llu:%u", a[i-1].idx_sobre,
-					a[i-1].cantidad_dinerin);
-			heap_shit_borrar_directo(cola, &a[i - 1].idx_sobre,
-					sizeof(a[i - 1].idx_sobre));
-		}
-		/*
-		 caca_log_debug("insertando %llu:%u", a[i].idx_sobre,
-		 a[i].cantidad_dinerin);
-		 heap_shit_insert(cola, nodos + i);
-		 */
-		caca_log_debug("insertando final %llu:%u", a[i+k-1].idx_sobre,
-				a[i+k-1].cantidad_dinerin);
-		heap_shit_insert(cola, nodos + i + k - 1);
-		sobre *max = heap_shit_consulta_torpe(cola);
+	for (i = 1; i <= a_tam - k; i++) {
+		natural idx_a_reemplazar = mapeo[i - 1];
+		natural idx_que_reemplaza = i + k - 1;
+
+		caca_log_debug("reemplazando %llu:%u con %llu:%u idx a reemp %u",
+				a[idx_a_reemplazar].cantidad_dinerin,
+				a[idx_a_reemplazar].id_sobre,
+				a[idx_que_reemplaza].cantidad_dinerin,
+				a[idx_que_reemplaza].id_sobre, idx_a_reemplazar);
+		assert_timeout(a[idx_a_reemplazar].id_sobre == i - 1);
+
+		a[idx_a_reemplazar] = a[idx_que_reemplaza];
+		mapeo[a[idx_a_reemplazar].id_sobre] = idx_a_reemplazar;
+		monton_montonizar(a, k, idx_a_reemplazar, mapeo, MAX_CACA, 0);
+		max = a;
 		caca_log_debug("el max en %u es %llu", i, max->cantidad_dinerin);
 		printf("%llu", max->cantidad_dinerin);
 		if (i < a_tam - k) {
@@ -1753,11 +594,7 @@ void fuck_core(sobre *a, natural a_tam, natural k) {
 		}
 	}
 	printf("\n");
-	heap_shit_fini(cola);
-	free(nodos);
 }
-
-//sobre sobres[MAX_CACA] = { 0 };
 
 void fuck_main() {
 	natural n = 0;
@@ -1770,9 +607,9 @@ void fuck_main() {
 	while (n) {
 		for (i = 0; i < n; i++) {
 			scanf("%llu", &sobres[i].cantidad_dinerin);
-			sobres[i].idx_sobre = i;
+			sobres[i].id_sobre = i;
 			caca_log_debug("leido %llu:%u", sobres[i].cantidad_dinerin,
-					sobres[i].idx_sobre);
+					sobres[i].id_sobre);
 		}
 
 		fuck_core(sobres, n, k);
