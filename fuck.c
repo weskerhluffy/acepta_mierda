@@ -471,13 +471,25 @@ CACA_COMUN_FUNC_STATICA void monton_push_up(sobre *sobres, natural sobres_tam,
 
 	*sobre_tmp = sobres[idx];
 	while (idx > idx_inicio
-			&& sobres[idx].cantidad_dinerin
+			&& sobre_tmp->cantidad_dinerin
 					> sobres[monton_obten_idx_padre(idx)].cantidad_dinerin) {
+		caca_log_debug("comparando %llu:%u en %u con %llu:%u en %u",
+				sobre_tmp->cantidad_dinerin, sobre_tmp->id_sobre, idx,
+				sobres[monton_obten_idx_padre(idx)].cantidad_dinerin,
+				sobres[monton_obten_idx_padre(idx)].id_sobre,
+				monton_obten_idx_padre(idx));
 		sobres[idx] = sobres[monton_obten_idx_padre(idx)];
 		mapeo[sobres[idx].id_sobre] = idx;
 		caca_log_debug("aora %llu:%u esta en %u", sobres[idx].cantidad_dinerin,
 				sobres[idx].id_sobre, idx);
 		idx = monton_obten_idx_padre(idx);
+	}
+	if (idx > idx_inicio) {
+		caca_log_debug("finalmente salio por %llu:%u en %u con %llu:%u en %u",
+				sobre_tmp->cantidad_dinerin, sobre_tmp->id_sobre, idx,
+				sobres[monton_obten_idx_padre(idx)].cantidad_dinerin,
+				sobres[monton_obten_idx_padre(idx)].id_sobre,
+				monton_obten_idx_padre(idx));
 	}
 	sobres[idx] = *sobre_tmp;
 	mapeo[sobres[idx].id_sobre] = idx;
@@ -499,19 +511,32 @@ CACA_COMUN_FUNC_STATICA void monton_push_down(sobre *sobres, natural sobres_tam,
 		natural idx_hijo = idx;
 		natural idx_hijo_izq = monton_obten_idx_hijo_izq(idx);
 		natural idx_hijo_der = monton_obten_idx_hijo_der(idx);
+		sobre *sobre_hijo = sobre_tmp;
+		caca_log_debug("comparando %llu:%u con %llu:%u",
+				sobres[idx_hijo_izq].cantidad_dinerin,
+				sobres[idx_hijo_izq].id_sobre, sobre_hijo->cantidad_dinerin,
+				sobre_hijo->id_sobre);
 		if (sobres[idx_hijo_izq].cantidad_dinerin
-				> sobres[idx_hijo].cantidad_dinerin) {
+				> sobre_hijo->cantidad_dinerin) {
 			idx_hijo = idx_hijo_izq;
+			sobre_hijo = sobres + idx_hijo;
+		}
+		if (idx_hijo_der < sobres_tam) {
+			caca_log_debug("comparando %llu:%u con %llu:%u",
+					sobres[idx_hijo_der].cantidad_dinerin,
+					sobres[idx_hijo_der].id_sobre, sobre_hijo->cantidad_dinerin,
+					sobre_hijo->id_sobre);
 		}
 		if (idx_hijo_der < sobres_tam
 				&& sobres[idx_hijo_der].cantidad_dinerin
-						> sobres[idx_hijo].cantidad_dinerin) {
+						> sobre_hijo->cantidad_dinerin) {
 			idx_hijo = idx_hijo_der;
 		}
-		if (idx == idx_hijo) {
+		if (idx_hijo == idx) {
 			break;
 		}
-		sobres[idx] = sobres[idx_hijo];
+		sobre_hijo = sobres + idx_hijo;
+		sobres[idx] = *sobre_hijo;
 		mapeo[sobres[idx].id_sobre] = idx;
 		caca_log_debug("aora %llu:%u esta en %u", sobres[idx].cantidad_dinerin,
 				sobres[idx].id_sobre, idx);
@@ -532,11 +557,15 @@ CACA_COMUN_FUNC_STATICA void monton_montonizar(sobre *sobres,
 	natural idx_padre = monton_obten_idx_padre(idx);
 	assert_timeout(i < sobres_tam);
 
+	caca_log_debug("montonizando %llu:%u", sobres[idx].cantidad_dinerin,
+			sobres[idx].id_sobre);
 	if (idx > idx_inicio
 			&& sobres[idx].cantidad_dinerin
 					> sobres[idx_padre].cantidad_dinerin) {
+		caca_log_debug("empujando arriba");
 		monton_push_up(sobres, sobres_tam, idx, mapeo, mapeo_tam, idx_inicio);
 	} else {
+		caca_log_debug("empujando abajo");
 		monton_push_down(sobres, sobres_tam, idx, mapeo, mapeo_tam, idx_inicio);
 	}
 }
@@ -568,7 +597,7 @@ void fuck_core(sobre *a, natural a_tam, natural k) {
 	max = a;
 	caca_log_debug("el maxe en %u es %llu", i, max->cantidad_dinerin);
 	printf("%llu", max->cantidad_dinerin);
-	if (i > 1) {
+	if (a_tam > 1 && k < a_tam) {
 		printf(" ");
 	}
 
