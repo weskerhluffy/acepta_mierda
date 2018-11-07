@@ -579,14 +579,15 @@ CACA_COMUN_FUNC_STATICA void monton_crear(sobre *sobres, natural sobres_tam,
 	}
 }
 
-sobre sobres[MAX_CACA] = { 0 };
-natural mapeo[MAX_CACA] = { 0 };
-
 void fuck_core(sobre *a, natural a_tam, natural k) {
 	sobre *s = NULL;
 	natural i = 0;
 	sobre *max = NULL;
+	natural *mapeo = NULL;
 	caca_log_debug("n %u k %u", a_tam, k);
+
+	mapeo = calloc(MAX_CACA + 1, sizeof(natural));
+	assert_timeout(mapeo);
 
 	for (i = 0; i < a_tam; i++) {
 		mapeo[i] = a[i].id_sobre;
@@ -623,6 +624,8 @@ void fuck_core(sobre *a, natural a_tam, natural k) {
 		}
 	}
 	printf("\n");
+
+	free(mapeo);
 }
 
 void fuck_main() {
